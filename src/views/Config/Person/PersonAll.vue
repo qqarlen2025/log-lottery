@@ -7,7 +7,8 @@ import useStore from '@/store'
 import { addOtherInfo } from '@/utils'
 import { readFileBinary } from '@/utils/file'
 import { storeToRefs } from 'pinia'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
+import dayjs from 'dayjs'
 import { useI18n } from 'vue-i18n'
 import * as XLSX from 'xlsx'
 
@@ -16,6 +17,45 @@ const personConfig = useStore().personConfig
 const { getAllPersonList: allPersonList, getAlreadyPersonList: alreadyPersonList } = storeToRefs(personConfig)
 const limitType = '.xlsx,.xls'
 // const personList = ref<any[]>([])
+
+const prizeConfig = useStore().prizeConfig
+const { getPrizeConfig: prizeList } = storeToRefs(prizeConfig)
+
+const setWinnerDialog = ref()
+const selectedPerson = ref<IPersonConfig | null>(null)
+const selectedPrizeId = ref('')
+
+function handleSetAsWinner(row: IPersonConfig) {
+  selectedPerson.value = row
+  selectedPrizeId.value = prizeList.value && prizeList.value.length > 0 ? String(prizeList.value[0].id) : ''
+  // Template refs are stored in `.value` when accessed in script setup
+  if (setWinnerDialog && setWinnerDialog.value && (setWinnerDialog.value as any).showModal) {
+    ;(setWinnerDialog.value as any).showModal()
+  }
+}
+
+function confirmSetAsWinner() {
+  if (!selectedPerson.value) {
+    return
+  }
+  const prize = (prizeList.value || []).find((p: any) => p.id === selectedPrizeId.value)
+  if (!prize) {
+    // eslint-disable-next-line no-alert
+    alert(i18n.global.t('error.completeInformation'))
+    return
+  }
+
+  // Use the centralized store action to mark the person as winner (overwrite previous prize info)
+  personConfig.markPersonAsWinner(selectedPerson.value.id, prize)
+
+  // close the dialog
+  if (setWinnerDialog && setWinnerDialog.value && (setWinnerDialog.value as any).close) {
+    ;(setWinnerDialog.value as any).close()
+  }
+  // reset selection
+  selectedPerson.value = null
+  selectedPrizeId.value = ''
+}
 
 const resetDataDialog = ref()
 const delAllDataDialog = ref()
@@ -28,6 +68,14 @@ async function handleFileChange(e: Event) {
   const allData = addOtherInfo(excelData)
   personConfig.resetPerson()
   personConfig.addNotPersonList(allData)
+
+  // 把导入时已标记为中奖的人员移动到已中奖名单，方便在界面中查看/管理
+  const winners = allData.filter((p: any) => p.isWin === true)
+  if (winners.length > 0) {
+    winners.forEach((p: any) => {
+      personConfig.personConfig.alreadyPersonList.push(p)
+    })
+  }
 }
 function exportData() {
   let data = JSON.parse(JSON.stringify(allPersonList.value))
@@ -38,7 +86,7 @@ function exportData() {
     delete data[i].id
     delete data[i].createTime
     delete data[i].updateTime
-    delete data[i].prizeId
+    // 保留 prizeId 以便导出后可再导入作为预设中奖信息
     // 修改字段名称
     if (data[i].isWin) {
       data[i].isWin = i18n.global.t('data.yes')
@@ -46,14 +94,23 @@ function exportData() {
     else {
       data[i].isWin = i18n.global.t('data.no')
     }
-    // 格式化数组为
+    // 格式化排除状态
+    if (data[i].isExcluded) {
+      data[i].isExcluded = i18n.global.t('data.yes')
+    }
+    else {
+      data[i].isExcluded = i18n.global.t('data.no')
+    }
+    // 格式化数组为字符串，方便导出到Excel并可导回
     data[i].prizeTime = data[i].prizeTime.join(',')
     data[i].prizeName = data[i].prizeName.join(',')
+    data[i].prizeId = data[i].prizeId.join(',')
   }
   let dataString = JSON.stringify(data)
   dataString = dataString
     .replaceAll(/uid/g, i18n.global.t('data.number'))
     .replaceAll(/isWin/g, i18n.global.t('data.isWin'))
+    .replaceAll(/isExcluded/g, i18n.global.t('data.excludeStatus'))
     .replaceAll(/department/g, i18n.global.t('data.department'))
     .replaceAll(/name/g, i18n.global.t('data.name'))
     .replaceAll(/identity/g, i18n.global.t('data.identity'))
@@ -107,22 +164,78 @@ const tableColumns = [
     props: 'identity',
   },
   {
-    label: i18n.global.t('data.isWin'),
-    props: 'isWin',
+    label: i18n.global.t('data.prizeName'),
+    props: 'prizeName',
+    sort: true,
     formatValue(row: IPersonConfig) {
-      return row.isWin ? i18n.global.t('data.yes') : i18n.global.t('data.no')
+      const prizes = Array.isArray(row.prizeName) ? row.prizeName.join(', ') : (row.prizeName || '')
+      const safe = String(prizes).replace(/"/g, '&quot;')
+      const display = prizes.length > 30 ? `${prizes.slice(0, 30)}...` : prizes
+
+      // 如果是管理员预设（preset），在显示前加上黄色内定 Badge
+      const badge = row.preset ? `<span style="display:inline-block; background:#FFEC99; color:#222; padding:2px 6px; border-radius:6px; margin-right:8px; font-size:12px;">内定</span>` : ''
+
+      return `${badge}<span title="${safe}" style="display:inline-block; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${display}</span>`
     },
   },
   {
+    label: i18n.global.t('data.isWin'),
+    props: 'isWin',
+    formatValue(row: IPersonConfig) {
+      if (row.isWin) {
+        const prizes = Array.isArray(row.prizeName) ? row.prizeName.join(', ') : (row.prizeName || '')
+        return `${i18n.global.t('data.yes')} ${prizes ? '- ' + prizes : ''}`
+      }
+
+      return i18n.global.t('data.no')
+    },
+  },
+  {
+    label: i18n.global.t('data.excludeStatus'),
+    props: 'isExcluded',
+    formatValue(row: IPersonConfig) {
+      if (row.isExcluded) {
+        return `<span style="color:red;">${i18n.global.t('data.excluded')}</span>`
+      }
+      return i18n.global.t('data.notExcluded')
+    },
+  },
+
+  {
     label: i18n.global.t('data.operation'),
     actions: [
-      // {
-      //     label: '编辑',
-      //     type: 'btn-info',
-      //     onClick: (row: any) => {
-      //         delPersonItem(row)
-      //     }
-      // },
+      {
+        label: i18n.global.t('data.setAsWinner'),
+        type: 'btn-success',
+        hidden: (row: IPersonConfig) => !!row.isWin,
+        onClick: (row: IPersonConfig) => {
+          handleSetAsWinner(row)
+        },
+      },
+      {
+        label: i18n.global.t('data.setAsNotWinner'),
+        type: 'btn-warning',
+        hidden: (row: IPersonConfig) => !row.isWin,
+        onClick: (row: IPersonConfig) => {
+          // call store action
+          const prizeConfig = useStore().personConfig
+          prizeConfig.markPersonAsNotWinner(row.id)
+        },
+      },
+      {
+        label: (row: IPersonConfig) => row.isExcluded ? i18n.global.t('data.cancelExclude') : i18n.global.t('data.excludePerson'),
+        type: (row: IPersonConfig) => row.isExcluded ? 'btn-success' : 'btn-warning',
+        hidden: (row: IPersonConfig) => !!row.isWin, // 已中奖人员不显示此按钮
+        onClick: (row: IPersonConfig) => {
+          if (row.isExcluded) {
+            // 取消排除
+            personConfig.toggleExcludePerson(row.id, false)
+          } else {
+            // 设置排除
+            personConfig.toggleExcludePerson(row.id, true, '手动排除')
+          }
+        },
+      },
       {
         label: i18n.global.t('data.delete'),
         type: 'btn-error',
@@ -177,6 +290,28 @@ onMounted(() => {
           <button class="btn" @click="deleteAll">
             {{ t('button.confirm') }}
           </button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="set_winner_dialog" ref="setWinnerDialog" class="border-none modal">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold">
+        {{ t('dialog.titleTip') }}
+      </h3>
+      <div class="py-2">
+        <label class="flex items-center gap-2">
+          <span class="label-text">{{ t('data.prizeName') }}:</span>
+          <select v-model="selectedPrizeId" class="select select-bordered">
+            <option v-for="p in prizeList" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-action">
+        <form method="dialog" class="flex gap-3">
+          <button class="btn" @click="setWinnerDialog.close()">{{ t('button.cancel') }}</button>
+          <button class="btn" @click="confirmSetAsWinner()">{{ t('button.confirm') }}</button>
         </form>
       </div>
     </div>

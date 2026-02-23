@@ -6,6 +6,12 @@ export interface IPersonConfig {
     identity: string;
     avatar: string;
     isWin: boolean;
+    // 如果是由管理员"设为中奖"（内定），标记为 preset，抽奖时可以作为候选抽到，抽中后会被清除
+    preset?: boolean;
+    // 标记是否被排除（不参与抽奖）
+    isExcluded?: boolean;
+    // 排除原因（可选）
+    excludeReason?: string;
     x: number;
     y: number
     createTime: string;

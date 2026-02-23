@@ -1,6 +1,7 @@
 import type { IPersonConfig, IPrizeConfig } from '@/types/storeType'
 
 const originUrl = 'https://to2026.xyz'
+const isFileMode = import.meta.env.MODE === 'file'
 
 export const defaultPersonList = <IPersonConfig[]>
     [
@@ -42,7 +43,7 @@ export const defaultPersonList = <IPersonConfig[]>
         { uid: 'U100156036', name: '芸娘', department: '江湖', avatar: 'https://img1.baidu.com/it/u=2165937980,813753762&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500', x: 2, y: 3, id: 35, isWin: false, createTime: 'Tue Jan 09 2024 23:20:07 GMT+0800 (China Standard Time)', updateTime: 'Tue Jan 09 2024 23:20:07 GMT+0800 (China Standard Time)', prizeName: [], prizeTime: [], prizeId: [] },
     ]
 
-export const defaultMusicList = [
+export const defaultMusicList = (isFileMode ? [] : [
     {
         id: `Geoff Knorr - China (The Industrial Era).ogg${new Date().getTime().toString()}`,
         name: 'Geoff Knorr - China (The Industrial Era).ogg',
@@ -99,9 +100,9 @@ export const defaultMusicList = [
         url: `${originUrl}/resource/audio/与非门 - Happy New Year.ogg`,
     },
 
-]
+])
 
-export const defaultPrizeList = <IPrizeConfig[]>[
+export const defaultPrizeList = <IPrizeConfig[]>(isFileMode ? [] : [
     {
         id: '001',
         name: '三等奖',
@@ -207,7 +208,7 @@ export const defaultPrizeList = <IPrizeConfig[]>[
         isUsed: false,
         frequency: 1,
     },
-]
+])
 export const defaultCurrentPrize = <IPrizeConfig>{
     id: '001',
     name: '三等奖',
@@ -251,7 +252,7 @@ export const defaultTemporaryPrize = <IPrizeConfig>{
     frequency: 1,
 }
 
-export const defaultImageList = [
+export const defaultImageList = (isFileMode ? [] : [
     {
         id: '0',
         name: '一等奖',
@@ -277,5 +278,5 @@ export const defaultImageList = [
         name: '特别奖',
         url: `${originUrl}/resource/image/image5.png`,
     },
-]
+])
 export const defaultPatternList = [21, 38, 55, 54, 53, 70, 87, 88, 89, 23, 40, 57, 74, 91, 92, 93, 76, 59, 42, 25, 24, 27, 28, 29, 46, 63, 62, 61, 78, 95, 96, 97, 20, 19, 31, 48, 65, 66, 67, 84, 101, 100, 99, 32, 33]

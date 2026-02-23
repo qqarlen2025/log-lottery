@@ -139,6 +139,11 @@ const tableColumnsDetail = [
     <DaiysuiTable v-if="!isDetail" :table-columns="tableColumnsList" :data="alreadyPersonList" />
 
     <DaiysuiTable v-if="isDetail" :table-columns="tableColumnsDetail" :data="alreadyPersonDetail" />
+
+    <!-- 在已中奖页面也展示内定 badge（以便快速识别） -->
+    <template v-if="!isDetail">
+      <!-- already shown above -->
+    </template>
   </div>
 </template>
 

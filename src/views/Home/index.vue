@@ -428,10 +428,32 @@ function startLottery() {
     }
   }
   luckyCount.value = leftover < luckyCount.value ? leftover : luckyCount.value
-  for (let i = 0; i < luckyCount.value; i++) {
+  // 先把被管理员预设为该奖项的人员优先加入（保证他们能在抽奖时被选中）
+  let need = luckyCount.value
+  if (need > 0) {
+    const presetCandidates = personPool.value.filter((p: any) => p.preset === true && p.prizeId.includes(String(currentPrize.value.id)))
+    if (presetCandidates.length > 0) {
+      for (let j = 0; j < presetCandidates.length && need > 0; j++) {
+        const p = presetCandidates[j]
+        // push if not already included
+        if (!luckyTargets.value.find((lt: any) => lt.id === p.id)) {
+          luckyTargets.value.push(p)
+          // remove from pool
+          const idx = personPool.value.findIndex((x: any) => x.id === p.id)
+          if (idx > -1) {
+            personPool.value.splice(idx, 1)
+          }
+          need--
+        }
+      }
+    }
+  }
+
+  // 剩余名额用随机方式抽取
+  for (let i = 0; i < need; i++) {
     if (personPool.value.length > 0) {
-      // 解决随机元素概率过于不均等问题
-      const randomIndex = Math.floor(Math.random() * (personPool.value.length - 1))
+      // 随机索引
+      const randomIndex = Math.floor(Math.random() * personPool.value.length)
       luckyTargets.value.push(personPool.value[randomIndex])
       personPool.value.splice(randomIndex, 1)
     }
@@ -593,9 +615,9 @@ function randomBallData(mod: 'default' | 'lucky' | 'sphere' = 'default') {
     const cardRandomIndexArr: number[] = []
     const personRandomIndexArr: number[] = []
     for (let i = 0; i < indexLength; i++) {
-      // 解决随机元素概率过于不均等问题
-      const randomCardIndex = Math.floor(Math.random() * (tableData.value.length - 1))
-      const randomPersonIndex = Math.floor(Math.random() * (allPersonList.value.length - 1))
+      // 解决随机元素概率过于不均等问题（修正为使用 length）
+      const randomCardIndex = Math.floor(Math.random() * tableData.value.length)
+      const randomPersonIndex = Math.floor(Math.random() * allPersonList.value.length)
       if (luckyCardList.value.includes(randomCardIndex)) {
         continue
       }

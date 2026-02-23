@@ -21,8 +21,16 @@ fn.mock.calls[0] === [mockRes];
 
 describe('Request', () => {
   it('should return data when request success', async () => {
-    const request = new Request();
-    const res = await request({
+    // mock axios.create to avoid real network
+    vi.spyOn(axios, 'create').mockReturnValue({
+      request: () => Promise.resolve({ data: mockRes.data }),
+      interceptors: {
+        request: { use: () => {} },
+        response: { use: () => {} },
+      },
+    } as any)
+
+    const res = await Request({
       url: '/test',
       method: 'GET',
     });
