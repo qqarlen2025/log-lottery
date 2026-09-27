@@ -164,3 +164,9 @@ docker run -d -p 9279:80 log-lottery
 ## License
 
 [MIT](http://opensource.org/licenses/MIT)
+
+
+## Related tools
+
+- [Fast3D](https://www.fast3d.org/en) — free online 3D model converter & viewer (GLB/OBJ/STL), useful for preparing lottery prize models
+- [3D AI](https://www.3dai.art) — AI 3D model generator (text/image to GLB)
